@@ -1,4 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Outfits">
+<meta name="theme-color" content="#eceef2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f111a" media="(prefers-color-scheme: dark)">
 <title>Week of Outfits</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f48d4'/%3E%3Cpath d='M11 7l5 3 5-3 5 4-3 4-2-1v11H11V14l-2 1-3-4z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -34,6 +44,10 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; -webkit-text-size-adjust: 100%; }
 body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
 button, input, textarea, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -128,6 +142,8 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 </style>
+</head>
+<body>
 
 <div class="wrap">
   <div class="bar">
@@ -185,6 +201,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
 
 <div id="toast" class="toast" hidden></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
 (() => {
   const DAYS = [
@@ -198,9 +215,20 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   const state = {};
   DAYS.forEach(d => state[d.key] = { photos: [], note: "" });
   const pending = {}; // day -> count of uploads in flight
-  let db = null, assets = null;
+  // Supabase project. The publishable key is meant to ship in browser code;
+  // the rules in supabase/setup.sql decide what it can do.
+  const SUPABASE_URL = "https://kfykfsmomffmopiheasp.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_P3LJhJT_s1W9BGg23u9aWQ_lw3F6bYC";
+  const BUCKET = "outfits";
+  const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+  let ready = false; // true once the week has loaded from Supabase
 
-  const src = (id) => "/_blob/" + id;
+  const src = (path) => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path.split("/").map(encodeURIComponent).join("/")}`;
+  const removePhotos = async (paths) => {
+    if (!paths.length) return;
+    const { error } = await sb.storage.from(BUCKET).remove(paths);
+    if (error) console.warn("Couldn't delete photos", error);
+  };
 
   // ---- dates ----
   const now = new Date();
@@ -231,15 +259,19 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   $("tab-today").onclick = () => show("today");
   $("tab-week").onclick = () => show("week");
   if (location.hash === "#week") show("week");
+  window.addEventListener("hashchange", () => show(location.hash === "#week" ? "week" : "today"));
 
   // ---- saving (one write at a time per day) ----
   const queues = {};
   function save(day) {
-    if (!db) return;
-    const body = { photos: [...state[day].photos], note: state[day].note };
+    if (!ready) return;
+    const body = { photos: [...state[day].photos], note: state[day].note, updated_at: new Date().toISOString() };
     queues[day] = (queues[day] || Promise.resolve())
-      .then(() => db.doc("days/" + day).set(body))
-      .catch(e => toast(e && e.code === "invalid_argument" ? "You don't have permission to edit this plan." : "Couldn't save. Check your connection and try again."));
+      .then(async () => {
+        const { error } = await sb.from("days").update(body).eq("day", day);
+        if (error) throw error;
+      })
+      .catch(() => toast("Couldn't save. Check your connection and try again."));
     return queues[day];
   }
 
@@ -257,7 +289,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   }
 
   async function addFiles(day, files) {
-    if (!assets) { toast("Only the plan's owner can add photos."); return; }
+    if (!ready) { toast("Still connecting. Try again in a moment."); return; }
     const imgs = [...files].filter(f => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
     if (!imgs.length) { toast("Drop image files (JPEG, PNG, WebP)."); return; }
     pending[day] = (pending[day] || 0) + imgs.length; renderWeek();
@@ -265,15 +297,13 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
       try {
         const blob = await shrink(f);
         if (!blob) throw { code: "decode" };
-        const r = await assets.upload(blob, { type: "image/jpeg" });
-        state[day].photos.push(r.id);
+        const path = `${day}/${crypto.randomUUID()}.jpg`;
+        const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
+        if (error) throw { code: "upload" };
+        state[day].photos.push(path);
         save(day);
       } catch (e) {
-        const code = e && e.code;
-        toast(code === "quota_or_state" ? "Storage is full. Remove some photos first."
-          : code === "too_large" ? `${f.name} is too large.`
-          : !code || code === "decode" ? `Couldn't read ${f.name}. Try a JPEG or PNG.`
-          : `Couldn't upload ${f.name}. Try again.`);
+        toast(e && e.code === "upload" ? `Couldn't upload ${f.name}. Try again.` : `Couldn't read ${f.name}. Try a JPEG or PNG.`);
       } finally {
         pending[day]--; renderWeek(); renderToday();
       }
@@ -336,7 +366,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
       state[d.key].photos.forEach((id, idx) => {
         const b = document.createElement("button");
         b.className = "ph"; b.type = "button"; b.dataset.idx = idx;
-        b.draggable = !!assets;
+        b.draggable = ready;
         b.setAttribute("aria-label", `${d.name} photo ${idx + 1}. Open options`);
         const img = document.createElement("img"); img.src = src(id); img.alt = ""; img.loading = "lazy";
         b.appendChild(img);
@@ -351,11 +381,11 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
         photos.appendChild(s);
       }
       if (document.activeElement !== note) note.value = state[d.key].note;
-      cols[d.key].col.querySelector(".add").hidden = !assets;
-      note.readOnly = !db;
+      cols[d.key].col.querySelector(".add").hidden = !ready;
+      note.readOnly = !ready;
     });
     const total = DAYS.reduce((n, d) => n + state[d.key].photos.length, 0);
-    $("clear-week").hidden = !assets || total === 0;
+    $("clear-week").hidden = !ready || total === 0;
   }
 
   async function movePhoto(fromDay, fromIdx, toDay, beforeIdx) {
@@ -378,7 +408,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     sel = { day, idx };
     $("sheet-img").src = src(state[day].photos[idx]);
     moveSel.value = day;
-    const canEdit = !!assets;
+    const canEdit = ready;
     [moveSel, $("sheet-left"), $("sheet-right"), $("sheet-remove")].forEach(el => el.disabled = !canEdit);
     $("sheet-left").disabled ||= idx === 0;
     $("sheet-right").disabled ||= idx === state[day].photos.length - 1;
@@ -397,7 +427,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     const [id] = state[day].photos.splice(idx, 1);
     sheet.close(); renderWeek(); renderToday();
     await save(day);
-    try { await assets.delete(id); } catch {}
+    await removePhotos([id]);
     toast("Photo removed");
   };
 
@@ -416,7 +446,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     DAYS.forEach(d => { state[d.key].photos = []; state[d.key].note = ""; });
     renderWeek(); renderToday();
     for (const d of DAYS) await save(d.key);
-    for (const id of ids) { try { await assets.delete(id); } catch {} }
+    await removePhotos(ids);
     toast("Week cleared");
   };
 
@@ -466,31 +496,46 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   renderWeek(); renderToday();
 
   // ---- connect storage ----
+  const status = $("status");
+  function setStatus(msg) { status.hidden = !msg; status.textContent = msg || ""; }
+
+  function applyRow(row) {
+    if (!row || !state[row.day]) return;
+    state[row.day] = {
+      photos: Array.isArray(row.photos) ? row.photos.filter(x => typeof x === "string") : [],
+      // keep what's being typed rather than a stale server copy
+      note: document.activeElement === cols[row.day].note ? state[row.day].note
+        : typeof row.note === "string" ? row.note : "",
+    };
+  }
+
+  async function load() {
+    const { data, error } = await sb.from("days").select("day, photos, note");
+    if (error) { setStatus("Couldn't load your outfits. Check your connection and reload."); return false; }
+    data.forEach(applyRow);
+    ready = true; setStatus("");
+    renderWeek(); renderToday();
+    return true;
+  }
+
   (async () => {
-    const use = window.claude && window.claude.use ? (n) => window.claude.use(n) : async () => null;
-    const [d, a] = await Promise.all([use("db"), use("assets")]);
-    db = d; assets = a;
-    const status = $("status");
-    if (!db) {
-      status.hidden = false;
-      status.textContent = "Open this page from its claude.ai link while signed in to see and save your outfits.";
-      renderWeek(); return;
-    }
-    if (!assets) { status.hidden = false; status.textContent = "You're viewing this plan read-only."; }
-    renderWeek();
-    db.collection("days").onSnapshot(snap => {
-      snap.docs.forEach(doc => {
-        if (!state[doc.id]) return;
-        const data = doc.data() || {};
-        state[doc.id] = {
-          photos: Array.isArray(data.photos) ? data.photos.filter(x => typeof x === "string") : [],
-          // keep what's being typed rather than a stale server copy
-          note: document.activeElement === cols[doc.id].note ? state[doc.id].note
-            : typeof data.note === "string" ? data.note : "",
-        };
-      });
-      renderWeek(); renderToday();
-    }, () => { status.hidden = false; status.textContent = "Lost connection to your saved outfits. Reload the page."; });
+    if (!sb) { setStatus("Couldn't load the storage library. Check your connection and reload."); return; }
+    if (!(await load())) return;
+    // Live updates from other devices.
+    sb.channel("days")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "days" }, (p) => {
+        applyRow(p.new); renderWeek(); renderToday();
+      })
+      .subscribe();
+    // Phones drop the live connection while asleep; refresh when the page comes back.
+    // Reopening on a new day starts over so "Today" is right.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) return;
+      if (new Date().toDateString() !== now.toDateString()) location.reload();
+      else load();
+    });
   })();
 })();
 </script>
+</body>
+</html>
