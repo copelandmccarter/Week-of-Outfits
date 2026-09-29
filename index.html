@@ -1,0 +1,496 @@
+<title>Week of Outfits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a lookbook. "Today" is one big full-bleed photo stack; "Week" is a rail of seven hang-tagged days. */
+:root {
+  --bg: #eceef2;
+  --surface: #ffffff;
+  --ink: #161a2b;
+  --muted: #5d6377;
+  --line: #d4d8e1;
+  --accent: #2f48d4;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2e6fb;
+  --danger: #b42318;
+  --shadow: 0 1px 2px rgba(22,26,43,.06), 0 8px 24px rgba(22,26,43,.06);
+  --f-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --f-body: "Manrope", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f111a; --surface: #181b27; --ink: #e9ebf3; --muted: #9ba1b6; --line: #2a2f41;
+    --accent: #8197ff; --accent-ink: #0f111a; --accent-soft: #232a4d; --danger: #ff8b7b;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f111a; --surface: #181b27; --ink: #e9ebf3; --muted: #9ba1b6; --line: #2a2f41;
+  --accent: #8197ff; --accent-ink: #0f111a; --accent-soft: #232a4d; --danger: #ff8b7b;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+button, input, textarea, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 48px; }
+
+/* Top bar */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-block: 4px 20px; }
+.brand { font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.tabs { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.tabs button { border: 0; background: none; padding: 6px 16px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+
+.status { font-size: 13px; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--line); border-radius: 10px; margin-bottom: 16px; }
+
+/* Today */
+.today-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.today-head h1 { font-family: var(--f-display); font-style: italic; font-weight: 400; font-size: clamp(44px, 9vw, 76px); line-height: .95; margin: 0; letter-spacing: -.01em; }
+.tag { font-family: var(--f-mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+.tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; }
+
+.stage { position: relative; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+.carousel { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.carousel::-webkit-scrollbar { display: none; }
+.carousel figure { flex: 0 0 100%; margin: 0; scroll-snap-align: center; display: grid; place-items: center; height: min(74vh, 820px); min-height: 320px; padding: 8px; }
+.carousel img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; }
+.dots { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; justify-content: center; gap: 6px; pointer-events: none; }
+.dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); opacity: .22; transition: opacity .2s; }
+.dots span.on { opacity: .85; }
+.nav-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 18px; box-shadow: var(--shadow); }
+.nav-btn.prev { left: 12px; } .nav-btn.next { right: 12px; }
+@media (hover: none) { .nav-btn { display: none; } }
+.note-today { font-size: 18px; margin: 16px 2px 0; max-width: 60ch; }
+.note-today:empty { display: none; }
+.empty { display: grid; place-items: center; text-align: center; gap: 12px; min-height: 360px; padding: 32px 20px; color: var(--muted); }
+.empty strong { display: block; font-family: var(--f-display); font-style: italic; font-weight: 400; font-size: 30px; color: var(--ink); }
+
+.next-up { margin-top: 28px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.next-up .thumbs { display: flex; gap: 6px; }
+.next-up img { width: 44px; height: 58px; object-fit: cover; border-radius: 6px; }
+.link-btn { border: 0; background: none; color: var(--accent); cursor: pointer; font-weight: 600; padding: 0; }
+
+/* Week */
+.week-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.week-head h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(34px, 6vw, 52px); line-height: 1; margin: 0; }
+.week-head p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.btn.danger { color: var(--danger); }
+.btn.danger.armed { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.day { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; transition: border-color .15s, background .15s; }
+.day.is-today { border-color: var(--ink); }
+.day.drop { border-color: var(--accent); background: var(--accent-soft); }
+.day-h { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.day-h b { font-family: var(--f-display); font-style: italic; font-weight: 400; font-size: 24px; line-height: 1; }
+.day-h span { font-family: var(--f-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.today-pill { font-family: var(--f-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; background: var(--ink); color: var(--bg); padding: 2px 6px; border-radius: 4px; }
+
+.photos { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.ph { position: relative; padding: 0; border: 0; background: var(--bg); border-radius: 8px; overflow: hidden; cursor: grab; aspect-ratio: 3 / 4; max-width: 100%; }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.ph.dragging { opacity: .35; }
+.ph.insert { box-shadow: 0 -3px 0 0 var(--accent); }
+.ph.loading { display: grid; place-items: center; cursor: default; }
+.ph.loading::after { content: ""; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.add { border: 1.5px dashed var(--line); background: none; border-radius: 8px; padding: 14px 8px; cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 600; text-align: center; }
+.add:hover { border-color: var(--accent); color: var(--accent); }
+.note { width: 100%; resize: vertical; min-height: 58px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px; font-size: 13px; line-height: 1.4; }
+.note::placeholder { color: var(--muted); }
+
+@media (max-width: 1080px) {
+  .week { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+@media (max-width: 640px) {
+  .week { grid-template-columns: minmax(0, 1fr); }
+  .photos { display: flex; overflow-x: auto; scroll-snap-type: x proximity; }
+  .ph { flex: 0 0 38%; scroll-snap-align: start; }
+}
+
+/* Photo sheet */
+dialog { border: 0; border-radius: 16px; padding: 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); width: min(420px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(10,12,20,.55); }
+.sheet { display: grid; gap: 14px; padding: 16px; }
+.sheet img { width: 100%; max-height: 50vh; object-fit: contain; border-radius: 10px; background: var(--bg); }
+.sheet .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sheet label { font-size: 13px; color: var(--muted); }
+.sheet select { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 10px; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <span class="brand">Week of Outfits</span>
+    <div class="tabs" role="tablist">
+      <button id="tab-today" role="tab" aria-selected="true">Today</button>
+      <button id="tab-week" role="tab" aria-selected="false">Plan week</button>
+    </div>
+  </div>
+
+  <div id="status" class="status" hidden></div>
+
+  <section id="view-today">
+    <div class="today-head">
+      <h1 id="today-name">Today</h1>
+      <span class="tag" id="today-date"></span>
+    </div>
+    <div class="stage" id="stage"></div>
+    <p class="note-today" id="today-note"></p>
+    <div class="next-up" id="next-up" hidden></div>
+  </section>
+
+  <section id="view-week" hidden>
+    <div class="week-head">
+      <div>
+        <h1>This week</h1>
+        <p id="week-range"></p>
+      </div>
+      <button class="btn danger" id="clear-week" hidden>Clear week</button>
+    </div>
+    <div class="week" id="week"></div>
+  </section>
+</div>
+
+<input type="file" id="file-input" accept="image/*" multiple hidden>
+
+<dialog id="sheet">
+  <div class="sheet">
+    <img id="sheet-img" alt="">
+    <div class="row">
+      <label for="sheet-move">Move to</label>
+      <select id="sheet-move"></select>
+    </div>
+    <div class="row">
+      <button class="btn" id="sheet-left">← Earlier</button>
+      <button class="btn" id="sheet-right">Later →</button>
+      <span style="flex:1"></span>
+      <button class="btn danger" id="sheet-remove">Remove</button>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" id="sheet-close">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+  const DAYS = [
+    { key: "mon", name: "Monday" }, { key: "tue", name: "Tuesday" }, { key: "wed", name: "Wednesday" },
+    { key: "thu", name: "Thursday" }, { key: "fri", name: "Friday" }, { key: "sat", name: "Saturday" },
+    { key: "sun", name: "Sunday" },
+  ];
+  const MAX_EDGE = 1600;
+  const $ = (id) => document.getElementById(id);
+
+  const state = {};
+  DAYS.forEach(d => state[d.key] = { photos: [], note: "" });
+  const pending = {}; // day -> count of uploads in flight
+  let db = null, assets = null;
+
+  const src = (id) => "/_blob/" + id;
+
+  // ---- dates ----
+  const now = new Date();
+  const todayIdx = (now.getDay() + 6) % 7; // Mon = 0
+  const todayKey = DAYS[todayIdx].key;
+  const monday = new Date(now); monday.setDate(now.getDate() - todayIdx);
+  const dateOf = (i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; };
+  const fmtShort = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  $("today-name").textContent = DAYS[todayIdx].name;
+  $("today-date").textContent = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  $("week-range").textContent = `${fmtShort(dateOf(0))} – ${fmtShort(dateOf(6))}. Drag photos from your computer onto a day.`;
+
+  // ---- toast ----
+  let toastT;
+  function toast(msg) {
+    const t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200);
+  }
+
+  // ---- tabs ----
+  function show(view) {
+    const week = view === "week";
+    $("view-week").hidden = !week; $("view-today").hidden = week;
+    $("tab-week").setAttribute("aria-selected", week); $("tab-today").setAttribute("aria-selected", !week);
+    try { history.replaceState(null, "", week ? "#week" : "#today"); } catch {}
+  }
+  $("tab-today").onclick = () => show("today");
+  $("tab-week").onclick = () => show("week");
+  if (location.hash === "#week") show("week");
+
+  // ---- saving (one write at a time per day) ----
+  const queues = {};
+  function save(day) {
+    if (!db) return;
+    const body = { photos: [...state[day].photos], note: state[day].note };
+    queues[day] = (queues[day] || Promise.resolve())
+      .then(() => db.doc("days/" + day).set(body))
+      .catch(e => toast(e && e.code === "invalid_argument" ? "You don't have permission to edit this plan." : "Couldn't save. Check your connection and try again."));
+    return queues[day];
+  }
+
+  // ---- image resize ----
+  async function shrink(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      return await new Promise(res => c.toBlob(res, "image/jpeg", 0.86));
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+  async function addFiles(day, files) {
+    if (!assets) { toast("Only the plan's owner can add photos."); return; }
+    const imgs = [...files].filter(f => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+    if (!imgs.length) { toast("Drop image files (JPEG, PNG, WebP)."); return; }
+    pending[day] = (pending[day] || 0) + imgs.length; renderWeek();
+    for (const f of imgs) {
+      try {
+        const blob = await shrink(f);
+        if (!blob) throw { code: "decode" };
+        const r = await assets.upload(blob, { type: "image/jpeg" });
+        state[day].photos.push(r.id);
+        save(day);
+      } catch (e) {
+        const code = e && e.code;
+        toast(code === "quota_or_state" ? "Storage is full. Remove some photos first."
+          : code === "too_large" ? `${f.name} is too large.`
+          : !code || code === "decode" ? `Couldn't read ${f.name}. Try a JPEG or PNG.`
+          : `Couldn't upload ${f.name}. Try again.`);
+      } finally {
+        pending[day]--; renderWeek(); renderToday();
+      }
+    }
+  }
+
+  // ---- week view ----
+  const weekEl = $("week");
+  const cols = {};
+  let activeDay = null;
+  const fileInput = $("file-input");
+  fileInput.onchange = () => { if (activeDay) addFiles(activeDay, fileInput.files); fileInput.value = ""; };
+
+  let drag = null; // {day, idx}
+  DAYS.forEach((d, i) => {
+    const col = document.createElement("div");
+    col.className = "day" + (d.key === todayKey ? " is-today" : "");
+    col.innerHTML = `
+      <div class="day-h"><b>${d.name.slice(0, 3)}</b>${d.key === todayKey ? '<span class="today-pill">Today</span>' : ""}<span>${fmtShort(dateOf(i))}</span></div>
+      <div class="photos"></div>
+      <button class="add" type="button">+ Add photos</button>
+      <textarea class="note" id="note-${d.key}" rows="2" placeholder="Notes: shoes, layers, accessories…"></textarea>`;
+    const photos = col.querySelector(".photos");
+    const note = col.querySelector(".note");
+    col.querySelector(".add").onclick = () => { activeDay = d.key; fileInput.click(); };
+
+    let noteT;
+    note.oninput = () => {
+      state[d.key].note = note.value;
+      clearTimeout(noteT); noteT = setTimeout(() => save(d.key), 700);
+      if (d.key === todayKey) renderToday();
+    };
+    note.onblur = () => { if (noteT) { clearTimeout(noteT); noteT = null; save(d.key); } };
+
+    let depth = 0;
+    col.addEventListener("dragenter", e => { e.preventDefault(); depth++; col.classList.add("drop"); });
+    col.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; col.classList.remove("drop"); } });
+    col.addEventListener("dragover", e => { e.preventDefault(); e.dataTransfer.dropEffect = drag ? "move" : "copy"; });
+    col.addEventListener("drop", e => {
+      e.preventDefault(); depth = 0; col.classList.remove("drop");
+      weekEl.querySelectorAll(".insert").forEach(n => n.classList.remove("insert"));
+      if (drag) {
+        const target = e.target.closest(".ph[data-idx]");
+        const before = target && target.closest(".day") === col ? +target.dataset.idx : state[d.key].photos.length;
+        movePhoto(drag.day, drag.idx, d.key, before);
+        drag = null;
+      } else if (e.dataTransfer.files && e.dataTransfer.files.length) {
+        addFiles(d.key, e.dataTransfer.files);
+      }
+    });
+
+    cols[d.key] = { col, photos, note };
+    weekEl.appendChild(col);
+  });
+
+  function renderWeek() {
+    DAYS.forEach(d => {
+      const { photos, note } = cols[d.key];
+      photos.replaceChildren();
+      state[d.key].photos.forEach((id, idx) => {
+        const b = document.createElement("button");
+        b.className = "ph"; b.type = "button"; b.dataset.idx = idx;
+        b.draggable = !!assets;
+        b.setAttribute("aria-label", `${d.name} photo ${idx + 1}. Open options`);
+        const img = document.createElement("img"); img.src = src(id); img.alt = ""; img.loading = "lazy";
+        b.appendChild(img);
+        b.onclick = () => openSheet(d.key, idx);
+        b.addEventListener("dragstart", e => { drag = { day: d.key, idx }; b.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", id); });
+        b.addEventListener("dragend", () => { drag = null; b.classList.remove("dragging"); weekEl.querySelectorAll(".insert").forEach(n => n.classList.remove("insert")); });
+        b.addEventListener("dragover", () => { if (drag) { weekEl.querySelectorAll(".insert").forEach(n => n.classList.remove("insert")); b.classList.add("insert"); } });
+        photos.appendChild(b);
+      });
+      for (let i = 0; i < (pending[d.key] || 0); i++) {
+        const s = document.createElement("div"); s.className = "ph loading"; s.setAttribute("aria-label", "Uploading");
+        photos.appendChild(s);
+      }
+      if (document.activeElement !== note) note.value = state[d.key].note;
+      cols[d.key].col.querySelector(".add").hidden = !assets;
+      note.readOnly = !db;
+    });
+    const total = DAYS.reduce((n, d) => n + state[d.key].photos.length, 0);
+    $("clear-week").hidden = !assets || total === 0;
+  }
+
+  async function movePhoto(fromDay, fromIdx, toDay, beforeIdx) {
+    const arr = state[fromDay].photos;
+    const [id] = arr.splice(fromIdx, 1);
+    if (!id) return;
+    if (fromDay === toDay && beforeIdx > fromIdx) beforeIdx--;
+    state[toDay].photos.splice(Math.max(0, Math.min(beforeIdx, state[toDay].photos.length)), 0, id);
+    renderWeek(); renderToday();
+    if (fromDay !== toDay) await save(fromDay);
+    await save(toDay);
+  }
+
+  // ---- photo sheet ----
+  const sheet = $("sheet");
+  let sel = null;
+  const moveSel = $("sheet-move");
+  DAYS.forEach(d => { const o = document.createElement("option"); o.value = d.key; o.textContent = d.name; moveSel.appendChild(o); });
+  function openSheet(day, idx) {
+    sel = { day, idx };
+    $("sheet-img").src = src(state[day].photos[idx]);
+    moveSel.value = day;
+    const canEdit = !!assets;
+    [moveSel, $("sheet-left"), $("sheet-right"), $("sheet-remove")].forEach(el => el.disabled = !canEdit);
+    $("sheet-left").disabled ||= idx === 0;
+    $("sheet-right").disabled ||= idx === state[day].photos.length - 1;
+    $("sheet-remove").textContent = "Remove"; $("sheet-remove").classList.remove("armed");
+    sheet.showModal();
+  }
+  $("sheet-close").onclick = () => sheet.close();
+  sheet.addEventListener("click", e => { if (e.target === sheet) sheet.close(); });
+  moveSel.onchange = () => { if (sel && moveSel.value !== sel.day) { movePhoto(sel.day, sel.idx, moveSel.value, Infinity); toast(`Moved to ${DAYS.find(d => d.key === moveSel.value).name}`); sheet.close(); } };
+  $("sheet-left").onclick = () => { movePhoto(sel.day, sel.idx, sel.day, sel.idx - 1); openSheet(sel.day, sel.idx - 1); };
+  $("sheet-right").onclick = () => { movePhoto(sel.day, sel.idx, sel.day, sel.idx + 2); openSheet(sel.day, sel.idx + 1); };
+  $("sheet-remove").onclick = async (e) => {
+    const b = e.currentTarget;
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Tap again to delete"; return; }
+    const { day, idx } = sel;
+    const [id] = state[day].photos.splice(idx, 1);
+    sheet.close(); renderWeek(); renderToday();
+    await save(day);
+    try { await assets.delete(id); } catch {}
+    toast("Photo removed");
+  };
+
+  // ---- clear week ----
+  let clearT;
+  $("clear-week").onclick = async (e) => {
+    const b = e.currentTarget;
+    const total = DAYS.reduce((n, d) => n + state[d.key].photos.length, 0);
+    if (!b.classList.contains("armed")) {
+      b.classList.add("armed"); b.textContent = `Delete all ${total} photos?`;
+      clearT = setTimeout(() => { b.classList.remove("armed"); b.textContent = "Clear week"; }, 4000);
+      return;
+    }
+    clearTimeout(clearT); b.classList.remove("armed"); b.textContent = "Clear week";
+    const ids = DAYS.flatMap(d => state[d.key].photos);
+    DAYS.forEach(d => { state[d.key].photos = []; state[d.key].note = ""; });
+    renderWeek(); renderToday();
+    for (const d of DAYS) await save(d.key);
+    for (const id of ids) { try { await assets.delete(id); } catch {} }
+    toast("Week cleared");
+  };
+
+  // ---- today view ----
+  function renderToday() {
+    const stage = $("stage");
+    const day = state[todayKey];
+    stage.replaceChildren();
+    if (!day.photos.length) {
+      stage.innerHTML = `<div class="empty"><div><strong>Nothing planned for today</strong>Add reference photos in the week plan and they'll show up here each morning.</div><button class="btn" type="button">Plan the week</button></div>`;
+      stage.querySelector("button").onclick = () => show("week");
+    } else {
+      const car = document.createElement("div"); car.className = "carousel";
+      day.photos.forEach((id, i) => {
+        const f = document.createElement("figure");
+        const img = document.createElement("img"); img.src = src(id); img.alt = `Outfit reference ${i + 1} of ${day.photos.length}`;
+        f.appendChild(img); car.appendChild(f);
+      });
+      stage.appendChild(car);
+      if (day.photos.length > 1) {
+        const dots = document.createElement("div"); dots.className = "dots";
+        day.photos.forEach((_, i) => { const s = document.createElement("span"); if (!i) s.className = "on"; dots.appendChild(s); });
+        stage.appendChild(dots);
+        const go = (dir) => car.scrollBy({ left: dir * car.clientWidth, behavior: "smooth" });
+        const prev = document.createElement("button"); prev.className = "nav-btn prev"; prev.textContent = "‹"; prev.setAttribute("aria-label", "Previous photo"); prev.onclick = () => go(-1);
+        const next = document.createElement("button"); next.className = "nav-btn next"; next.textContent = "›"; next.setAttribute("aria-label", "Next photo"); next.onclick = () => go(1);
+        stage.append(prev, next);
+        car.addEventListener("scroll", () => {
+          const i = Math.round(car.scrollLeft / car.clientWidth);
+          [...dots.children].forEach((s, j) => s.classList.toggle("on", i === j));
+        }, { passive: true });
+      }
+    }
+    $("today-note").textContent = day.note || "";
+
+    const nIdx = (todayIdx + 1) % 7, nKey = DAYS[nIdx].key, nDay = state[nKey];
+    const nu = $("next-up");
+    if (nDay.photos.length) {
+      nu.hidden = false;
+      nu.innerHTML = `<span class="tag">Tomorrow · ${DAYS[nIdx].name}</span><div class="thumbs"></div>`;
+      nDay.photos.slice(0, 4).forEach(id => { const i = document.createElement("img"); i.src = src(id); i.alt = ""; nu.querySelector(".thumbs").appendChild(i); });
+      const b = document.createElement("button"); b.className = "link-btn"; b.textContent = "See week"; b.onclick = () => show("week");
+      nu.appendChild(b);
+    } else nu.hidden = true;
+  }
+
+  renderWeek(); renderToday();
+
+  // ---- connect storage ----
+  (async () => {
+    const use = window.claude && window.claude.use ? (n) => window.claude.use(n) : async () => null;
+    const [d, a] = await Promise.all([use("db"), use("assets")]);
+    db = d; assets = a;
+    const status = $("status");
+    if (!db) {
+      status.hidden = false;
+      status.textContent = "Open this page from its claude.ai link while signed in to see and save your outfits.";
+      renderWeek(); return;
+    }
+    if (!assets) { status.hidden = false; status.textContent = "You're viewing this plan read-only."; }
+    renderWeek();
+    db.collection("days").onSnapshot(snap => {
+      snap.docs.forEach(doc => {
+        if (!state[doc.id]) return;
+        const data = doc.data() || {};
+        state[doc.id] = {
+          photos: Array.isArray(data.photos) ? data.photos.filter(x => typeof x === "string") : [],
+          // keep what's being typed rather than a stale server copy
+          note: document.activeElement === cols[doc.id].note ? state[doc.id].note
+            : typeof data.note === "string" ? data.note : "",
+        };
+      });
+      renderWeek(); renderToday();
+    }, () => { status.hidden = false; status.textContent = "Lost connection to your saved outfits. Reload the page."; });
+  })();
+})();
+</script>
