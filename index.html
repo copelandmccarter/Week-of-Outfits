@@ -118,6 +118,13 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 .add { border: 1.5px dashed var(--line); background: none; border-radius: 8px; padding: 14px 8px; cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 600; text-align: center; }
 .add:hover { border-color: var(--accent); color: var(--accent); }
+.add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.add-row[hidden] { display: none; }
+.paste { border: 1.5px dashed var(--line); border-radius: 8px; padding: 14px 8px; color: var(--muted); font-size: 13px; font-weight: 600; text-align: center; cursor: text; caret-color: transparent; overflow: hidden; white-space: nowrap; -webkit-user-select: text; user-select: text; }
+.paste:empty::before { content: "Paste image"; }
+.paste:hover, .paste:focus { border-color: var(--accent); color: var(--accent); outline: none; }
+.paste:focus:empty::before { content: attr(data-hint); }
+.day.selected:not(.drop) { border-color: var(--accent); }
 .note { width: 100%; resize: vertical; min-height: 58px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px; font-size: 13px; line-height: 1.4; }
 .note::placeholder { color: var(--muted); }
 
@@ -139,6 +146,31 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
 .sheet label { font-size: 13px; color: var(--muted); }
 .sheet select { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 10px; }
 
+/* Week navigation */
+.week-nav { display: flex; align-items: center; gap: 10px; }
+.icon-btn { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 18px; line-height: 1; color: var(--ink); }
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.wk-title { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: default; text-align: left; }
+.wk-title.off-week { cursor: pointer; }
+.wk-title.off-week:hover { color: var(--accent); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn:disabled { opacity: .45; cursor: default; }
+.row-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* Past looks: a rack of earlier outfits */
+.past { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px 12px; }
+.look { display: flex; flex-direction: column; gap: 6px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; min-width: 0; color: inherit; }
+.look-img { display: block; aspect-ratio: 3 / 4; max-width: 100%; border-radius: 10px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); transition: transform .15s; }
+.look:hover .look-img { transform: translateY(-2px); }
+.look img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.look .cap { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-variant-numeric: tabular-nums; }
+.look-note { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.past-empty { grid-column: 1 / -1; background: var(--surface); border-radius: 18px; }
+.pick-meta { margin: 0; font-family: var(--f-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.pick-note { margin: 0; font-size: 14px; }
+.pick-note:empty { display: none; }
+@media (max-width: 640px) { .past { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 </style>
@@ -151,6 +183,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     <div class="tabs" role="tablist">
       <button id="tab-today" role="tab" aria-selected="true">Today</button>
       <button id="tab-week" role="tab" aria-selected="false">Plan week</button>
+      <button id="tab-past" role="tab" aria-selected="false">Past looks</button>
     </div>
   </div>
 
@@ -169,12 +202,26 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   <section id="view-week" hidden>
     <div class="week-head">
       <div>
-        <h1>This week</h1>
+        <div class="week-nav">
+          <button class="icon-btn" id="wk-prev" type="button" aria-label="Previous week">‹</button>
+          <h1><button type="button" id="wk-title" class="wk-title">This week</button></h1>
+          <button class="icon-btn" id="wk-next" type="button" aria-label="Next week">›</button>
+        </div>
         <p id="week-range"></p>
       </div>
       <button class="btn danger" id="clear-week" hidden>Clear week</button>
     </div>
     <div class="week" id="week"></div>
+  </section>
+
+  <section id="view-past" hidden>
+    <div class="week-head">
+      <div>
+        <h1>Past looks</h1>
+        <p id="past-sub"></p>
+      </div>
+    </div>
+    <div class="past" id="past"></div>
   </section>
 </div>
 
@@ -199,6 +246,22 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   </div>
 </dialog>
 
+<dialog id="pick">
+  <div class="sheet">
+    <img id="pick-img" alt="">
+    <p class="pick-meta" id="pick-meta"></p>
+    <p class="pick-note" id="pick-note"></p>
+    <div class="row">
+      <label for="pick-day">Wear on</label>
+      <select id="pick-day"></select>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" id="pick-close" type="button">Cancel</button>
+      <button class="btn primary" id="pick-add" type="button">Add to plan</button>
+    </div>
+  </div>
+</dialog>
+
 <div id="toast" class="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
@@ -209,38 +272,46 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     { key: "thu", name: "Thursday" }, { key: "fri", name: "Friday" }, { key: "sat", name: "Saturday" },
     { key: "sun", name: "Sunday" },
   ];
+  const dayName = (k) => DAYS.find(d => d.key === k).name;
   const MAX_EDGE = 1600;
   const $ = (id) => document.getElementById(id);
-
-  const state = {};
-  DAYS.forEach(d => state[d.key] = { photos: [], note: "" });
-  const pending = {}; // day -> count of uploads in flight
   // Supabase project. The publishable key is meant to ship in browser code;
-  // the rules in supabase/setup.sql decide what it can do.
+  // the rules in supabase/setup.sql and supabase/weeks.sql decide what it can do.
   const SUPABASE_URL = "https://kfykfsmomffmopiheasp.supabase.co";
   const SUPABASE_KEY = "sb_publishable_P3LJhJT_s1W9BGg23u9aWQ_lw3F6bYC";
   const BUCKET = "outfits";
   const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
-  let ready = false; // true once the week has loaded from Supabase
-
+  let ready = false; // true once the plans have loaded from Supabase
   const src = (path) => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path.split("/").map(encodeURIComponent).join("/")}`;
-  const removePhotos = async (paths) => {
-    if (!paths.length) return;
-    const { error } = await sb.storage.from(BUCKET).remove(paths);
-    if (error) console.warn("Couldn't delete photos", error);
-  };
 
-  // ---- dates ----
+  // ---- dates (weeks run Monday to Sunday, keyed by Monday's date) ----
+  const pad = (n) => String(n).padStart(2, "0");
+  const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
   const now = new Date();
   const todayIdx = (now.getDay() + 6) % 7; // Mon = 0
   const todayKey = DAYS[todayIdx].key;
-  const monday = new Date(now); monday.setDate(now.getDate() - todayIdx);
-  const dateOf = (i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; };
+  const CUR = iso(addDays(new Date(now.getFullYear(), now.getMonth(), now.getDate()), -todayIdx));
+  const NEXT = iso(addDays(parse(CUR), 7));
+  const shiftWeek = (w, n) => iso(addDays(parse(w), 7 * n));
+  const dateOf = (week, i) => addDays(parse(week), i);
   const fmtShort = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const weekLabel = (w) => w === CUR ? "This week" : w === NEXT ? "Next week" : w === shiftWeek(CUR, -1) ? "Last week" : `Week of ${fmtShort(parse(w))}`;
+  let viewWeek = CUR;
+
+  // ---- data: one doc per day per week in "plans", id "<monday>_<day>" ----
+  const plans = {};
+  const pending = {};
+  const pid = (week, day) => week + "_" + day;
+  function get(week, day) {
+    const id = pid(week, day);
+    return plans[id] || (plans[id] = { week, day, photos: [], note: "" });
+  }
+  const isUsed = (photoId) => Object.values(plans).some(p => p.photos.includes(photoId));
 
   $("today-name").textContent = DAYS[todayIdx].name;
   $("today-date").textContent = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-  $("week-range").textContent = `${fmtShort(dateOf(0))} – ${fmtShort(dateOf(6))}. Drag photos from your computer onto a day.`;
 
   // ---- toast ----
   let toastT;
@@ -250,29 +321,38 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   }
 
   // ---- tabs ----
+  const VIEWS = ["today", "week", "past"];
+  let current = "today";
   function show(view) {
-    const week = view === "week";
-    $("view-week").hidden = !week; $("view-today").hidden = week;
-    $("tab-week").setAttribute("aria-selected", week); $("tab-today").setAttribute("aria-selected", !week);
-    try { history.replaceState(null, "", week ? "#week" : "#today"); } catch {}
+    current = view;
+    VIEWS.forEach(v => {
+      $("view-" + v).hidden = v !== view;
+      $("tab-" + v).setAttribute("aria-selected", v === view);
+    });
+    if (view === "past") renderPast();
+    try { history.replaceState(null, "", "#" + view); } catch {}
   }
-  $("tab-today").onclick = () => show("today");
-  $("tab-week").onclick = () => show("week");
-  if (location.hash === "#week") show("week");
-  window.addEventListener("hashchange", () => show(location.hash === "#week" ? "week" : "today"));
+  VIEWS.forEach(v => $("tab-" + v).onclick = () => show(v));
 
-  // ---- saving (one write at a time per day) ----
+  // ---- saving (one write at a time per doc) ----
   const queues = {};
-  function save(day) {
-    if (!ready) return;
-    const body = { photos: [...state[day].photos], note: state[day].note, updated_at: new Date().toISOString() };
-    queues[day] = (queues[day] || Promise.resolve())
+  function save(week, day) {
+    if (!ready) return Promise.resolve();
+    const p = get(week, day), id = pid(week, day);
+    const body = { week, day, photos: [...p.photos], note: p.note, updated_at: new Date().toISOString() };
+    queues[id] = (queues[id] || Promise.resolve())
       .then(async () => {
-        const { error } = await sb.from("days").update(body).eq("day", day);
+        const { error } = await sb.from("plans").upsert(body, { onConflict: "week,day" });
         if (error) throw error;
       })
       .catch(() => toast("Couldn't save. Check your connection and try again."));
-    return queues[day];
+    return queues[id];
+  }
+  // Photos can be reused across weeks, so only delete a file nothing points to.
+  async function dropAssetIfUnused(path) {
+    if (!ready || isUsed(path)) return;
+    const { error } = await sb.storage.from(BUCKET).remove([path]);
+    if (error) console.warn("Couldn't delete photo", error);
   }
 
   // ---- image resize ----
@@ -288,55 +368,110 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     } finally { URL.revokeObjectURL(url); }
   }
 
-  async function addFiles(day, files) {
+  async function addFiles(week, day, files) {
     if (!ready) { toast("Still connecting. Try again in a moment."); return; }
     const imgs = [...files].filter(f => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
     if (!imgs.length) { toast("Drop image files (JPEG, PNG, WebP)."); return; }
-    pending[day] = (pending[day] || 0) + imgs.length; renderWeek();
+    const id = pid(week, day);
+    pending[id] = (pending[id] || 0) + imgs.length; renderWeek();
     for (const f of imgs) {
       try {
         const blob = await shrink(f);
         if (!blob) throw { code: "decode" };
-        const path = `${day}/${crypto.randomUUID()}.jpg`;
+        const path = `${week}/${day}/${crypto.randomUUID()}.jpg`;
         const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
         if (error) throw { code: "upload" };
-        state[day].photos.push(path);
-        save(day);
+        get(week, day).photos.push(path);
+        save(week, day);
       } catch (e) {
         toast(e && e.code === "upload" ? `Couldn't upload ${f.name}. Try again.` : `Couldn't read ${f.name}. Try a JPEG or PNG.`);
       } finally {
-        pending[day]--; renderWeek(); renderToday();
+        pending[id]--; renderAll();
       }
     }
   }
+
+  // ---- paste images (e.g. "Copy image" on Pinterest) ----
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const PASTE_HINT = isMac ? "Now press ⌘V" : "Now press Ctrl+V";
+  let selectedDay = todayKey;
+  function selectDay(key) {
+    selectedDay = key;
+    DAYS.forEach(d => cols[d.key] && cols[d.key].col.classList.toggle("selected", d.key === key));
+  }
+  document.addEventListener("paste", e => {
+    const cd = e.clipboardData;
+    if (!cd) return;
+    const files = [...(cd.files || [])].filter(f => f.type.startsWith("image/"));
+    if (!files.length && cd.items) {
+      for (const it of cd.items) if (it.kind === "file" && it.type.startsWith("image/")) { const f = it.getAsFile(); if (f) files.push(f); }
+    }
+    const inZone = e.target.closest && e.target.closest(".paste");
+    if (!files.length) {
+      if (inZone) {
+        e.preventDefault();
+        toast("That copied a link or text, not the picture. On Pinterest, right-click the image and choose Copy Image.");
+      }
+      return; // let normal text pastes into notes work
+    }
+    e.preventDefault();
+    if (current === "past") { toast("Switch to Today or Plan week to paste a photo."); return; }
+    const fromDay = e.target.closest && e.target.closest(".day");
+    const [week, day] = current === "today" ? [CUR, todayKey]
+      : [viewWeek, fromDay ? fromDay.dataset.day : selectedDay];
+    if (!ready) { toast("Still connecting. Try again in a moment."); return; }
+    toast(`Adding to ${dayName(day)}…`);
+    addFiles(week, day, files);
+    if (inZone) inZone.blur();
+  });
 
   // ---- week view ----
   const weekEl = $("week");
   const cols = {};
   let activeDay = null;
   const fileInput = $("file-input");
-  fileInput.onchange = () => { if (activeDay) addFiles(activeDay, fileInput.files); fileInput.value = ""; };
+  fileInput.onchange = () => { if (activeDay) addFiles(viewWeek, activeDay, fileInput.files); fileInput.value = ""; };
+
+  function goWeek(n) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // flush a note being typed
+    viewWeek = shiftWeek(viewWeek, n);
+    renderWeek();
+  }
+  $("wk-prev").onclick = () => goWeek(-1);
+  $("wk-next").onclick = () => goWeek(1);
+  $("wk-title").onclick = () => { if (viewWeek !== CUR) { viewWeek = CUR; renderWeek(); } };
 
   let drag = null; // {day, idx}
-  DAYS.forEach((d, i) => {
+  DAYS.forEach((d) => {
     const col = document.createElement("div");
-    col.className = "day" + (d.key === todayKey ? " is-today" : "");
+    col.className = "day";
+    col.dataset.day = d.key;
     col.innerHTML = `
-      <div class="day-h"><b>${d.name.slice(0, 3)}</b>${d.key === todayKey ? '<span class="today-pill">Today</span>' : ""}<span>${fmtShort(dateOf(i))}</span></div>
+      <div class="day-h"><b>${d.name.slice(0, 3)}</b><span class="today-pill" hidden>Today</span><span class="d-date"></span></div>
       <div class="photos"></div>
-      <button class="add" type="button">+ Add photos</button>
+      <div class="add-row">
+        <button class="add" type="button">+ Add photos</button>
+        <div class="paste" id="paste-${d.key}" contenteditable="true" inputmode="none" role="textbox" aria-label="Paste an image into ${d.name}" data-hint="${PASTE_HINT}" spellcheck="false"></div>
+      </div>
       <textarea class="note" id="note-${d.key}" rows="2" placeholder="Notes: shoes, layers, accessories…"></textarea>`;
     const photos = col.querySelector(".photos");
     const note = col.querySelector(".note");
+    const pasteZone = col.querySelector(".paste");
     col.querySelector(".add").onclick = () => { activeDay = d.key; fileInput.click(); };
+    pasteZone.addEventListener("input", () => { pasteZone.replaceChildren(); });
+    col.addEventListener("pointerdown", () => selectDay(d.key));
+    col.addEventListener("focusin", () => selectDay(d.key));
 
-    let noteT;
+    let noteT = null, noteWeek = null;
+    const flush = () => { if (noteT) { clearTimeout(noteT); noteT = null; save(noteWeek, d.key); } };
     note.oninput = () => {
-      state[d.key].note = note.value;
-      clearTimeout(noteT); noteT = setTimeout(() => save(d.key), 700);
-      if (d.key === todayKey) renderToday();
+      if (noteWeek && noteWeek !== viewWeek) flush();
+      noteWeek = viewWeek;
+      get(viewWeek, d.key).note = note.value;
+      clearTimeout(noteT); noteT = setTimeout(() => { noteT = null; save(noteWeek, d.key); }, 700);
+      if (viewWeek === CUR && d.key === todayKey) renderToday();
     };
-    note.onblur = () => { if (noteT) { clearTimeout(noteT); noteT = null; save(d.key); } };
+    note.onblur = flush;
 
     let depth = 0;
     col.addEventListener("dragenter", e => { e.preventDefault(); depth++; col.classList.add("drop"); });
@@ -347,23 +482,34 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
       weekEl.querySelectorAll(".insert").forEach(n => n.classList.remove("insert"));
       if (drag) {
         const target = e.target.closest(".ph[data-idx]");
-        const before = target && target.closest(".day") === col ? +target.dataset.idx : state[d.key].photos.length;
-        movePhoto(drag.day, drag.idx, d.key, before);
+        const before = target && target.closest(".day") === col ? +target.dataset.idx : get(viewWeek, d.key).photos.length;
+        movePhoto(viewWeek, drag.day, drag.idx, d.key, before);
         drag = null;
       } else if (e.dataTransfer.files && e.dataTransfer.files.length) {
-        addFiles(d.key, e.dataTransfer.files);
+        addFiles(viewWeek, d.key, e.dataTransfer.files);
       }
     });
 
     cols[d.key] = { col, photos, note };
     weekEl.appendChild(col);
   });
+  selectDay(todayKey);
 
   function renderWeek() {
-    DAYS.forEach(d => {
-      const { photos, note } = cols[d.key];
+    const isCur = viewWeek === CUR;
+    $("wk-title").textContent = weekLabel(viewWeek);
+    $("wk-title").title = isCur ? "" : "Back to this week";
+    $("wk-title").classList.toggle("off-week", !isCur);
+    $("week-range").textContent = `${fmtShort(dateOf(viewWeek, 0))} – ${fmtShort(dateOf(viewWeek, 6))}. Drag photos onto a day, or click a day and paste a copied image.`;
+    DAYS.forEach((d, i) => {
+      const { col, photos, note } = cols[d.key];
+      const p = get(viewWeek, d.key);
+      const here = isCur && d.key === todayKey;
+      col.classList.toggle("is-today", here);
+      col.querySelector(".today-pill").hidden = !here;
+      col.querySelector(".d-date").textContent = fmtShort(dateOf(viewWeek, i));
       photos.replaceChildren();
-      state[d.key].photos.forEach((id, idx) => {
+      p.photos.forEach((id, idx) => {
         const b = document.createElement("button");
         b.className = "ph"; b.type = "button"; b.dataset.idx = idx;
         b.draggable = ready;
@@ -376,58 +522,60 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
         b.addEventListener("dragover", () => { if (drag) { weekEl.querySelectorAll(".insert").forEach(n => n.classList.remove("insert")); b.classList.add("insert"); } });
         photos.appendChild(b);
       });
-      for (let i = 0; i < (pending[d.key] || 0); i++) {
+      for (let k = 0; k < (pending[pid(viewWeek, d.key)] || 0); k++) {
         const s = document.createElement("div"); s.className = "ph loading"; s.setAttribute("aria-label", "Uploading");
         photos.appendChild(s);
       }
-      if (document.activeElement !== note) note.value = state[d.key].note;
-      cols[d.key].col.querySelector(".add").hidden = !ready;
+      if (document.activeElement !== note) note.value = p.note;
+      col.querySelector(".add-row").hidden = !ready;
       note.readOnly = !ready;
     });
-    const total = DAYS.reduce((n, d) => n + state[d.key].photos.length, 0);
+    const total = DAYS.reduce((n, d) => n + get(viewWeek, d.key).photos.length, 0);
     $("clear-week").hidden = !ready || total === 0;
   }
 
-  async function movePhoto(fromDay, fromIdx, toDay, beforeIdx) {
-    const arr = state[fromDay].photos;
+  async function movePhoto(week, fromDay, fromIdx, toDay, beforeIdx) {
+    const arr = get(week, fromDay).photos;
     const [id] = arr.splice(fromIdx, 1);
     if (!id) return;
     if (fromDay === toDay && beforeIdx > fromIdx) beforeIdx--;
-    state[toDay].photos.splice(Math.max(0, Math.min(beforeIdx, state[toDay].photos.length)), 0, id);
-    renderWeek(); renderToday();
-    if (fromDay !== toDay) await save(fromDay);
-    await save(toDay);
+    const dest = get(week, toDay).photos;
+    dest.splice(Math.max(0, Math.min(beforeIdx, dest.length)), 0, id);
+    renderAll();
+    if (fromDay !== toDay) await save(week, fromDay);
+    await save(week, toDay);
   }
 
-  // ---- photo sheet ----
+  // ---- photo sheet (a photo in the week being planned) ----
   const sheet = $("sheet");
   let sel = null;
   const moveSel = $("sheet-move");
   DAYS.forEach(d => { const o = document.createElement("option"); o.value = d.key; o.textContent = d.name; moveSel.appendChild(o); });
   function openSheet(day, idx) {
-    sel = { day, idx };
-    $("sheet-img").src = src(state[day].photos[idx]);
+    sel = { week: viewWeek, day, idx };
+    const list = get(viewWeek, day).photos;
+    $("sheet-img").src = src(list[idx]);
     moveSel.value = day;
     const canEdit = ready;
     [moveSel, $("sheet-left"), $("sheet-right"), $("sheet-remove")].forEach(el => el.disabled = !canEdit);
     $("sheet-left").disabled ||= idx === 0;
-    $("sheet-right").disabled ||= idx === state[day].photos.length - 1;
+    $("sheet-right").disabled ||= idx === list.length - 1;
     $("sheet-remove").textContent = "Remove"; $("sheet-remove").classList.remove("armed");
-    sheet.showModal();
+    if (!sheet.open) sheet.showModal();
   }
   $("sheet-close").onclick = () => sheet.close();
   sheet.addEventListener("click", e => { if (e.target === sheet) sheet.close(); });
-  moveSel.onchange = () => { if (sel && moveSel.value !== sel.day) { movePhoto(sel.day, sel.idx, moveSel.value, Infinity); toast(`Moved to ${DAYS.find(d => d.key === moveSel.value).name}`); sheet.close(); } };
-  $("sheet-left").onclick = () => { movePhoto(sel.day, sel.idx, sel.day, sel.idx - 1); openSheet(sel.day, sel.idx - 1); };
-  $("sheet-right").onclick = () => { movePhoto(sel.day, sel.idx, sel.day, sel.idx + 2); openSheet(sel.day, sel.idx + 1); };
+  moveSel.onchange = () => { if (sel && moveSel.value !== sel.day) { movePhoto(sel.week, sel.day, sel.idx, moveSel.value, Infinity); toast(`Moved to ${dayName(moveSel.value)}`); sheet.close(); } };
+  $("sheet-left").onclick = () => { movePhoto(sel.week, sel.day, sel.idx, sel.day, sel.idx - 1); openSheet(sel.day, sel.idx - 1); };
+  $("sheet-right").onclick = () => { movePhoto(sel.week, sel.day, sel.idx, sel.day, sel.idx + 2); openSheet(sel.day, sel.idx + 1); };
   $("sheet-remove").onclick = async (e) => {
     const b = e.currentTarget;
-    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Tap again to delete"; return; }
-    const { day, idx } = sel;
-    const [id] = state[day].photos.splice(idx, 1);
-    sheet.close(); renderWeek(); renderToday();
-    await save(day);
-    await removePhotos([id]);
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Tap again to remove"; return; }
+    const { week, day, idx } = sel;
+    const [id] = get(week, day).photos.splice(idx, 1);
+    sheet.close(); renderAll();
+    await save(week, day);
+    await dropAssetIfUnused(id);
     toast("Photo removed");
   };
 
@@ -435,29 +583,117 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   let clearT;
   $("clear-week").onclick = async (e) => {
     const b = e.currentTarget;
-    const total = DAYS.reduce((n, d) => n + state[d.key].photos.length, 0);
+    const week = viewWeek;
+    const total = DAYS.reduce((n, d) => n + get(week, d.key).photos.length, 0);
     if (!b.classList.contains("armed")) {
-      b.classList.add("armed"); b.textContent = `Delete all ${total} photos?`;
+      b.classList.add("armed"); b.textContent = `Remove all ${total} photos?`;
       clearT = setTimeout(() => { b.classList.remove("armed"); b.textContent = "Clear week"; }, 4000);
       return;
     }
     clearTimeout(clearT); b.classList.remove("armed"); b.textContent = "Clear week";
-    const ids = DAYS.flatMap(d => state[d.key].photos);
-    DAYS.forEach(d => { state[d.key].photos = []; state[d.key].note = ""; });
-    renderWeek(); renderToday();
-    for (const d of DAYS) await save(d.key);
-    await removePhotos(ids);
+    const ids = DAYS.flatMap(d => get(week, d.key).photos);
+    DAYS.forEach(d => { const p = get(week, d.key); p.photos = []; p.note = ""; });
+    renderAll();
+    for (const d of DAYS) await save(week, d.key);
+    for (const id of new Set(ids)) await dropAssetIfUnused(id);
     toast("Week cleared");
+  };
+
+  // ---- past looks: every photo from weeks before this one, newest first ----
+  function pastLooks() {
+    const seen = new Map();
+    Object.values(plans)
+      .filter(p => p.week < CUR && p.photos.length)
+      .forEach(p => {
+        const i = DAYS.findIndex(d => d.key === p.day);
+        const date = dateOf(p.week, i);
+        p.photos.forEach(id => {
+          const cur = seen.get(id);
+          if (!cur) seen.set(id, { id, date, note: p.note, count: 1 });
+          else { cur.count++; if (date > cur.date) { cur.date = date; cur.note = p.note || cur.note; } }
+        });
+      });
+    return [...seen.values()].sort((a, b) => b.date - a.date);
+  }
+  const fmtWorn = (d) => d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+
+  function renderPast() {
+    const el = $("past");
+    const looks = pastLooks();
+    el.replaceChildren();
+    $("past-sub").textContent = looks.length
+      ? `${looks.length} outfit${looks.length === 1 ? "" : "s"} from earlier weeks. Tap one to wear it again.`
+      : "Outfits from earlier weeks will collect here.";
+    if (!looks.length) {
+      el.innerHTML = `<div class="empty past-empty"><div><strong>No past looks yet</strong>Each Monday, last week's outfits move here so you can repeat the ones you liked.</div></div>`;
+      return;
+    }
+    looks.forEach(l => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "look";
+      b.setAttribute("aria-label", `Outfit worn ${fmtWorn(l.date)}. Wear again`);
+      const frame = document.createElement("span"); frame.className = "look-img";
+      const img = document.createElement("img"); img.src = src(l.id); img.alt = ""; img.loading = "lazy";
+      frame.appendChild(img);
+      const cap = document.createElement("span"); cap.className = "cap";
+      cap.textContent = fmtWorn(l.date) + (l.count > 1 ? ` · ${l.count}×` : "");
+      b.append(frame, cap);
+      if (l.note) { const n = document.createElement("span"); n.className = "look-note"; n.textContent = l.note; b.appendChild(n); }
+      b.onclick = () => openPick(l);
+      el.appendChild(b);
+    });
+  }
+
+  // ---- wear again ----
+  const pick = $("pick");
+  const pickSel = $("pick-day");
+  let picked = null;
+  function fillPickOptions() {
+    pickSel.replaceChildren();
+    [[CUR, "This week"], [NEXT, "Next week"]].forEach(([w, label]) => {
+      const g = document.createElement("optgroup"); g.label = label;
+      DAYS.forEach((d, i) => {
+        if (w === CUR && i < todayIdx) return; // skip days already gone by
+        const o = document.createElement("option");
+        o.value = pid(w, d.key);
+        o.textContent = `${d.name}, ${fmtShort(dateOf(w, i))}`;
+        g.appendChild(o);
+      });
+      pickSel.appendChild(g);
+    });
+  }
+  function openPick(look) {
+    picked = look;
+    fillPickOptions();
+    pickSel.value = pid(CUR, todayIdx < 6 ? DAYS[todayIdx + 1].key : todayKey);
+    $("pick-img").src = src(look.id);
+    $("pick-meta").textContent = `Last worn ${fmtWorn(look.date)}` + (look.count > 1 ? ` · worn ${look.count} times` : "");
+    $("pick-note").textContent = look.note || "";
+    $("pick-add").disabled = !ready;
+    pick.showModal();
+  }
+  $("pick-close").onclick = () => pick.close();
+  pick.addEventListener("click", e => { if (e.target === pick) pick.close(); });
+  $("pick-add").onclick = async () => {
+    if (!picked) return;
+    const [week, day] = pickSel.value.split("_");
+    const p = get(week, day);
+    if (p.photos.includes(picked.id)) { toast(`Already on ${dayName(day)}`); pick.close(); return; }
+    p.photos.push(picked.id);
+    pick.close(); renderAll();
+    await save(week, day);
+    toast(`Added to ${dayName(day)}${week === NEXT ? " next week" : ""}`);
   };
 
   // ---- today view ----
   function renderToday() {
     const stage = $("stage");
-    const day = state[todayKey];
+    const day = get(CUR, todayKey);
     stage.replaceChildren();
     if (!day.photos.length) {
-      stage.innerHTML = `<div class="empty"><div><strong>Nothing planned for today</strong>Add reference photos in the week plan and they'll show up here each morning.</div><button class="btn" type="button">Plan the week</button></div>`;
-      stage.querySelector("button").onclick = () => show("week");
+      const hasPast = pastLooks().length > 0;
+      stage.innerHTML = `<div class="empty"><div><strong>Nothing planned for today</strong>Add photos in the week plan, paste a copied image right here${hasPast ? ", or repeat a past look" : ""}.</div><div class="row-btns"><button class="btn" type="button" data-go="week">Plan the week</button>${hasPast ? '<button class="btn" type="button" data-go="past">Past looks</button>' : ""}</div></div>`;
+      stage.querySelectorAll("[data-go]").forEach(b => b.onclick = () => show(b.dataset.go));
     } else {
       const car = document.createElement("div"); car.className = "carousel";
       day.photos.forEach((id, i) => {
@@ -482,39 +718,52 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     }
     $("today-note").textContent = day.note || "";
 
-    const nIdx = (todayIdx + 1) % 7, nKey = DAYS[nIdx].key, nDay = state[nKey];
+    // tomorrow, which on Sunday is next week's Monday
+    const nIdx = (todayIdx + 1) % 7, nWeek = todayIdx === 6 ? NEXT : CUR;
+    const nDay = get(nWeek, DAYS[nIdx].key);
     const nu = $("next-up");
     if (nDay.photos.length) {
       nu.hidden = false;
       nu.innerHTML = `<span class="tag">Tomorrow · ${DAYS[nIdx].name}</span><div class="thumbs"></div>`;
       nDay.photos.slice(0, 4).forEach(id => { const i = document.createElement("img"); i.src = src(id); i.alt = ""; nu.querySelector(".thumbs").appendChild(i); });
-      const b = document.createElement("button"); b.className = "link-btn"; b.textContent = "See week"; b.onclick = () => show("week");
+      const b = document.createElement("button"); b.className = "link-btn"; b.textContent = "See week";
+      b.onclick = () => { viewWeek = nWeek; renderWeek(); show("week"); };
       nu.appendChild(b);
     } else nu.hidden = true;
   }
 
-  renderWeek(); renderToday();
+  function renderAll() {
+    renderWeek(); renderToday();
+    if (current === "past") renderPast();
+  }
+
+  const startView = location.hash.slice(1);
+  if (VIEWS.includes(startView)) show(startView);
+  renderAll();
 
   // ---- connect storage ----
   const status = $("status");
   function setStatus(msg) { status.hidden = !msg; status.textContent = msg || ""; }
 
   function applyRow(row) {
-    if (!row || !state[row.day]) return;
-    state[row.day] = {
+    if (!row || !row.week || !DAYS.some(d => d.key === row.day)) return;
+    const week = String(row.week).slice(0, 10);
+    const id = pid(week, row.day);
+    const typing = document.activeElement === cols[row.day].note && week === viewWeek;
+    plans[id] = {
+      week, day: row.day,
       photos: Array.isArray(row.photos) ? row.photos.filter(x => typeof x === "string") : [],
       // keep what's being typed rather than a stale server copy
-      note: document.activeElement === cols[row.day].note ? state[row.day].note
-        : typeof row.note === "string" ? row.note : "",
+      note: typing && plans[id] ? plans[id].note : typeof row.note === "string" ? row.note : "",
     };
   }
 
   async function load() {
-    const { data, error } = await sb.from("days").select("day, photos, note");
+    const { data, error } = await sb.from("plans").select("week, day, photos, note");
     if (error) { setStatus("Couldn't load your outfits. Check your connection and reload."); return false; }
     data.forEach(applyRow);
     ready = true; setStatus("");
-    renderWeek(); renderToday();
+    renderAll();
     return true;
   }
 
@@ -522,13 +771,13 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     if (!sb) { setStatus("Couldn't load the storage library. Check your connection and reload."); return; }
     if (!(await load())) return;
     // Live updates from other devices.
-    sb.channel("days")
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "days" }, (p) => {
-        applyRow(p.new); renderWeek(); renderToday();
+    sb.channel("plans")
+      .on("postgres_changes", { event: "*", schema: "public", table: "plans" }, (p) => {
+        if (p.new) { applyRow(p.new); renderAll(); }
       })
       .subscribe();
     // Phones drop the live connection while asleep; refresh when the page comes back.
-    // Reopening on a new day starts over so "Today" is right.
+    // Reopening on a new day starts over so "Today" and the week are right.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) return;
       if (new Date().toDateString() !== now.toDateString()) location.reload();
