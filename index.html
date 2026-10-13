@@ -105,6 +105,10 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .day-h { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .day-h b { font-family: var(--f-display); font-style: italic; font-weight: 400; font-size: 24px; line-height: 1; }
 .day-h span { font-family: var(--f-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wx { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: -4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wx b, .wx-today b { color: var(--ink); font-weight: 600; }
+.wx-today { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: -4px 0 14px; font-size: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wx-today .place { font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .today-pill { font-family: var(--f-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; background: var(--ink); color: var(--bg); padding: 2px 6px; border-radius: 4px; }
 
 .photos { display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -194,6 +198,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
       <h1 id="today-name">Today</h1>
       <span class="tag" id="today-date"></span>
     </div>
+    <p class="wx-today" id="wx-today" hidden></p>
     <div class="stage" id="stage"></div>
     <p class="note-today" id="today-note"></p>
     <div class="next-up" id="next-up" hidden></div>
@@ -299,6 +304,66 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   const fmtShort = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const weekLabel = (w) => w === CUR ? "This week" : w === NEXT ? "Next week" : w === shiftWeek(CUR, -1) ? "Last week" : `Week of ${fmtShort(parse(w))}`;
   let viewWeek = CUR;
+
+  // ---- weather (Open-Meteo: free, no key; nothing is stored) ----
+  // Covers last week through next week; other weeks show no weather.
+  const WEATHER = { place: "New York", lat: 40.7128, lon: -74.006, tz: "America/New_York" };
+  // WMO weather codes -> short labels
+  const sky = (c) =>
+    c === 0 ? "Clear" : c === 1 ? "Mostly clear" : c === 2 ? "Partly cloudy" : c === 3 ? "Cloudy"
+    : c === 45 || c === 48 ? "Fog" : c === 56 || c === 57 ? "Freezing drizzle" : c >= 51 && c <= 55 ? "Drizzle"
+    : c === 66 || c === 67 ? "Freezing rain" : c >= 61 && c <= 65 ? "Rain" : c >= 71 && c <= 77 ? "Snow"
+    : c >= 80 && c <= 82 ? "Showers" : c === 85 || c === 86 ? "Snow showers" : c >= 95 ? "Thunderstorms" : "";
+  const weather = {}; // "YYYY-MM-DD" -> { hi, lo, sky, rain }
+  let weatherAt = 0;
+
+  async function loadWeather() {
+    if (Date.now() - weatherAt < 60 * 60 * 1000) return; // at most hourly
+    const q = new URLSearchParams({
+      latitude: WEATHER.lat, longitude: WEATHER.lon, timezone: WEATHER.tz,
+      daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+      temperature_unit: "fahrenheit", precipitation_unit: "inch",
+      start_date: shiftWeek(CUR, -1), end_date: iso(dateOf(NEXT, 6)),
+    });
+    try {
+      const r = await fetch("https://api.open-meteo.com/v1/forecast?" + q);
+      if (!r.ok) return;
+      const d = (await r.json()).daily;
+      d.time.forEach((t, k) => {
+        if (d.temperature_2m_max[k] == null) return;
+        weather[t] = {
+          hi: Math.round(d.temperature_2m_max[k]), lo: Math.round(d.temperature_2m_min[k]),
+          sky: sky(d.weather_code[k]), rain: d.precipitation_probability_max[k],
+        };
+      });
+      weatherAt = Date.now();
+      renderWeather();
+    } catch { /* no weather; the rest of the app is unaffected */ }
+  }
+
+  function weatherBits(w, big) {
+    const parts = [];
+    const temp = document.createElement("span");
+    const hi = document.createElement("b"); hi.textContent = `${w.hi}°`;
+    temp.append(hi, ` / ${w.lo}°`);
+    parts.push(temp);
+    if (w.sky) parts.push(Object.assign(document.createElement("span"), { textContent: w.sky }));
+    if (w.rain != null && w.rain >= 10) parts.push(Object.assign(document.createElement("span"), { textContent: `${w.rain}% rain` }));
+    if (big) parts.push(Object.assign(document.createElement("span"), { className: "place", textContent: WEATHER.place }));
+    return parts;
+  }
+
+  function renderWeather() {
+    DAYS.forEach((d, i) => {
+      if (!cols[d.key]) return;
+      const w = weather[iso(dateOf(viewWeek, i))], el = cols[d.key].wx;
+      el.hidden = !w;
+      if (w) { el.replaceChildren(...weatherBits(w, false)); el.title = `${d.name} in ${WEATHER.place}`; }
+    });
+    const t = weather[iso(dateOf(CUR, todayIdx))], el = $("wx-today");
+    el.hidden = !t;
+    if (t) el.replaceChildren(...weatherBits(t, true));
+  }
 
   // ---- data: one doc per day per week in "plans", id "<monday>_<day>" ----
   const plans = {};
@@ -448,6 +513,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     col.dataset.day = d.key;
     col.innerHTML = `
       <div class="day-h"><b>${d.name.slice(0, 3)}</b><span class="today-pill" hidden>Today</span><span class="d-date"></span></div>
+      <div class="wx" hidden></div>
       <div class="photos"></div>
       <div class="add-row">
         <button class="add" type="button">+ Add photos</button>
@@ -490,13 +556,14 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
       }
     });
 
-    cols[d.key] = { col, photos, note };
+    cols[d.key] = { col, photos, note, wx: col.querySelector(".wx") };
     weekEl.appendChild(col);
   });
   selectDay(todayKey);
 
   function renderWeek() {
     const isCur = viewWeek === CUR;
+    renderWeather();
     $("wk-title").textContent = weekLabel(viewWeek);
     $("wk-title").title = isCur ? "" : "Back to this week";
     $("wk-title").classList.toggle("off-week", !isCur);
@@ -740,6 +807,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
   const startView = location.hash.slice(1);
   if (VIEWS.includes(startView)) show(startView);
   renderAll();
+  loadWeather();
 
   // ---- connect storage ----
   const status = $("status");
@@ -781,7 +849,7 @@ dialog::backdrop { background: rgba(10,12,20,.55); }
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) return;
       if (new Date().toDateString() !== now.toDateString()) location.reload();
-      else load();
+      else { load(); loadWeather(); }
     });
   })();
 })();
